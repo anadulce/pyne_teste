@@ -9,6 +9,9 @@ readme = "README.md"
 python = "^3.9"
 channels = {extras = ["daphne"], version = "^4.1.0"}
 django = "^4.2"
+gunicorn = "^22.0.0"
+channels-redis = "^4.2.0"
+uvicorn = {extras = ["standard"], version = "^0.30.3"}
 
 
 [build-system]
