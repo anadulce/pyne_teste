@@ -1,0 +1,138 @@
+<!-- graph_app/templates/graph.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Graph</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stomp-websocket@2"></script>
+    <style>
+        svg {
+            width: 100%;
+            height: 100vh;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        .label {
+            font-size: 12px;
+            pointer-events: none; /* Para que o texto não interfira com o drag do nó */
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Graph</h1>
+    <div id="graph"></div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const username = "{{ request.session.name }}";
+            const socket = new WebSocket(`ws://${window.location.host}/ws/graph/?username=${encodeURIComponent(username)}`);
+            
+            
+
+            // Initialize D3
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            const svg = d3.select("#graph").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const linkGroup = svg.append("g").attr("class", "links");
+            const nodeGroup = svg.append("g").attr("class", "nodes");
+
+            let nodes = [];
+            let links = [];
+            const nodeMap = new Map(); // To quickly access nodes by ID
+
+            // Update graph with data
+            function updateGraph(data) {
+                nodes = data.nodes;
+                links = data.links;
+                nodeMap.clear();
+                nodes.forEach(node => nodeMap.set(node.id, node));
+
+                // Update links
+                const link = linkGroup.selectAll(".link")
+                    .data(links, d => `${d.source}-${d.target}`);
+
+                link.enter().append("line")
+                    .attr("class", "link")
+                    .merge(link)
+                    .attr("x1", d => nodeMap.get(d.source).x)
+                    .attr("y1", d => nodeMap.get(d.source).y)
+                    .attr("x2", d => nodeMap.get(d.target).x)
+                    .attr("y2", d => nodeMap.get(d.target).y);
+
+                link.exit().remove();
+
+                // Update nodes
+                const node = nodeGroup.selectAll(".node")
+                    .data(nodes, d => d.id);
+
+                const nodeEnter = node.enter().append("circle")
+                    .attr("class", "node")
+                    .attr("r", 10)
+                    .attr("fill", d => d.id === username ? "red" : "blue")
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended));
+
+                nodeEnter.append("title")
+                    .text(d => d.id);
+
+                node.merge(nodeEnter)
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+
+                node.exit().remove();
+
+                // Function for drag behavior
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+            }
+
+            // Handle incoming WebSocket messages
+            socket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                updateGraph(data);
+            };
+
+            // Send updates to the server when a node is clicked
+            nodeGroup.on("click", function (event, d) {
+                if (d.id !== username) {
+                    const newLink = {
+                        source: username,
+                        target: d.id
+                    };
+                    links.push(newLink);
+                    socket.send(JSON.stringify({
+                        nodes: nodes,
+                        links: links
+                    }));
+                }
+            });
+        });
+    </script>
+</body>
+</html>

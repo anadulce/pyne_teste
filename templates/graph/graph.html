@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grafo Interativo</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+</head>
+<body>
+    <svg id="graph" width="800" height="600"></svg>
+    {{ page|json_script:"page" }}
+
+    <script>
+        const page = JSON.parse(document.getElementById('page').textContent);
+        const socket = new WebSocket('ws://' 
+        + window.location.host 
+        + '/ws/graph/'
+        + page
+        + '/'
+        );
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const vertex = d3.select(`#vertex-${data.vertex_id}`);
+            vertex.attr('fill', data.color);
+        };
+
+        function handleClick(vertexId) {
+            socket.send(JSON.stringify({
+                'vertex_id': vertexId,
+                'color': 'red'
+            }));
+        }
+
+        // Exemplo de criação de vértices e bordas com d3.js
+        const svg = d3.select('#graph');
+        const nodes = svg.selectAll('circle')
+            .data([{ id: 1 }, { id: 2 }]) // exemplo de dados
+            .enter().append('circle')
+            .attr('id', d => `vertex-${d.id}`)
+            .attr('r', 20)
+            .attr('cx', (d, i) => i * 100 + 50)
+            .attr('cy', 100)
+            .attr('fill', 'blue')
+            .on('click', d => handleClick(d.id));
+    </script>
+</body>
+</html>
