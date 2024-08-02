@@ -1,25 +1,24 @@
 # graph_app/consumers.py
-import json
 from random import randint
+import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from .models import Node, Link
+from django.core.serializers.json import DjangoJSONEncoder
+from urllib.parse import parse_qs
+
+
 
 class GraphConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        self.username = self.scope['user'].username
-        if self.username == "":
-            self.username = self.scope['query_string'].decode('utf-8')
-        
-        # Initialize nodes and links
-        self.nodes = []
-        self.links = []
-        self.node_ids = set()  # To keep track of existing node IDs
 
-        # Check if node already exists
-        if self.username not in self.node_ids:
-            # Add new node
-            new_node = {'id': self.username, 'x': randint(0,900), 'y': randint(0, 600)}
-            self.nodes.append(new_node)
-            self.node_ids.add(self.username)
+    async def connect(self):
+        query_string = self.scope.get('query_string', b'').decode()
+        params = parse_qs(query_string)
+        self.username = params.get('username', [''])[0]
+        
+
+        # Add user node if not already present
+        await self.add_node(self.username)
         
         await self.channel_layer.group_add(
             "graph",
@@ -38,31 +37,57 @@ class GraphConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        new_nodes = data.get('nodes', [])
-        new_links = data.get('links', [])
+        nodes = data.get('nodes', [])
+        links = data.get('links', [])
+        print("TESTEEEEEEEEEEE")
 
-        # Update nodes and links
-        self.nodes = new_nodes
-        self.links = new_links
-        self.node_ids = set(node['id'] for node in self.nodes)
+        # Save updated state to database
+        from ipdb import set_trace
+        set_trace()
+        await self.save_graph_state(nodes, links)
 
         await self.channel_layer.group_send(
             "graph",
             {
                 'type': 'graph_update',
                 'data': {
-                    'nodes': self.nodes,
-                    'links': self.links
+                    'nodes': nodes,
+                    'links': links
                 }
             }
         )
 
     async def graph_update(self, event):
         data = event['data']
-        await self.send(text_data=json.dumps(data))
+        await self.send(text_data=json.dumps(data, cls=DjangoJSONEncoder))
+
+    @database_sync_to_async
+    def save_graph_state(self, nodes, links):
+        Node.objects.all().delete()  # Clear existing nodes
+        Link.objects.all().delete()  # Clear existing links
+        # Save nodes
+        for node in nodes:
+            Node.objects.create(id=node['id'], x=node['x'], y=node['y'])
+        # Save links
+        for link in links:
+            source_node = Node.objects.get(id=link['source'])
+            target_node = Node.objects.get(id=link['target'])
+            Link.objects.create(source=source_node, target=target_node)
+
+    @database_sync_to_async
+    def get_graph_state(self):
+        nodes = list(Node.objects.values('id', 'x', 'y'))
+        links = list(Link.objects.values('source', 'target'))
+        return {
+            'nodes': nodes,
+            'links': links
+        }
 
     async def send_graph_state(self):
-        await self.send(text_data=json.dumps({
-            'nodes': self.nodes,
-            'links': self.links
-        }))
+        graph_state = await self.get_graph_state()
+        await self.send(text_data=json.dumps(graph_state, cls=DjangoJSONEncoder))
+    
+    @database_sync_to_async
+    def add_node(self, username):
+        if not Node.objects.filter(id=username).exists():
+            Node.objects.create(id=username, x=randint(10, 1000), y=randint(10, 1000))
