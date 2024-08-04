@@ -66,7 +66,6 @@
                 links = data.links;
                 nodeMap.clear();
                 nodes.forEach(node => nodeMap.set(node.id, node));
-                alert(nodes)
                 // Update links
                 const link = linkGroup.selectAll(".link")
                     .data(links, d => `${d.source}-${d.target}`);
@@ -90,10 +89,7 @@
                     .attr("r", 10)
                     .attr("id", d => d.id)
                     .attr("fill", d => d.id === username ? "red" : "blue")
-                    // .call(d3.drag()
-                    //     .on("start", dragstarted)
-                    //     .on("drag", dragged)
-                    //     .on("end", dragended));
+                    .on("click", handleClick);
 
                 nodeEnter.append("title")
                     .text(d => d.id);
@@ -123,23 +119,6 @@
                 simulation.force("link").links(links);
                 simulation.alpha(1).restart();
 
-                // // Function for drag behavior
-                // function dragstarted(event, d) {
-                //     if (!event.active) simulation.alphaTarget(0.3).restart();
-                //     d.fx = d.x;
-                //     d.fy = d.y;
-                // }
-
-                // function dragged(event, d) {
-                //     d.fx = event.x;
-                //     d.fy = event.y;
-                // }
-
-                // function dragended(event, d) {
-                //     if (!event.active) simulation.alphaTarget(0);
-                //     d.fx = null;
-                //     d.fy = null;
-                // }
             }
 
             // Handle incoming WebSocket messages
@@ -150,7 +129,12 @@
 
             // Send updates to the server when a node is clicked
             nodeGroup.on("click", function (event, d) {
-                alert(d)
+                
+                    socket.send(JSON.stringify({
+                        update: true}));
+            });
+
+            function handleClick (event, d) {
                 if (d.id !== username) {
                     const newLink = {
                         source: username,
@@ -158,11 +142,10 @@
                     };
                     links.push(newLink);
                     socket.send(JSON.stringify({
-                        nodes: nodes,
-                        links: links
+                        target: d.id
                     }));
                 }
-            });
+            };
         });
     </script>
 </body>
