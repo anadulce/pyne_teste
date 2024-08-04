@@ -37,8 +37,8 @@ class GraphConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        from ipdb import set_trace
-        set_trace()
+        # from ipdb import set_trace
+        # set_trace()
         data = json.loads(text_data)
         # nodes = data.get('nodes', [])
         # links = data.get('links', [])
@@ -48,18 +48,18 @@ class GraphConsumer(AsyncWebsocketConsumer):
         if target:
             await self.add_link(target)
 
-        # await self.channel_layer.group_send(
-        #     "graph",
-        #     {
-        #         'type': 'graph_update',
-        #         'data': {
-        #             'nodes': nodes,
-        #             'links': links
-        #         }
-        #     }
-        # )
-        graph_state = await self.get_graph_state()
+        await self.send_graph_state()
+        # graph_state = await self.get_graph_state()
         
+        # await self.channel_layer.group_send("graph", {
+        #         'type': 'send_json_message', 
+        #         "message": graph_state
+        #         }
+        #     )
+    
+    async def send_json_message(self, event):
+        # Envia a mensagem JSON para o WebSocket
+        graph_state = event["message"]        
         await self.send(text_data=json.dumps(graph_state, cls=DjangoJSONEncoder))
 
     async def graph_update(self, event):
@@ -84,7 +84,11 @@ class GraphConsumer(AsyncWebsocketConsumer):
 
     async def send_graph_state(self):
         graph_state = await self.get_graph_state()
-        await self.send(text_data=json.dumps(graph_state, cls=DjangoJSONEncoder))
+        await self.channel_layer.group_send("graph", {
+                'type': 'send_json_message', 
+                "message": graph_state
+                }
+            )
     
     @database_sync_to_async
     def add_node(self):

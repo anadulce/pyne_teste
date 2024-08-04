@@ -12,6 +12,7 @@ django = "^4.2"
 gunicorn = "^22.0.0"
 channels-redis = "^4.2.0"
 uvicorn = {extras = ["standard"], version = "^0.30.3"}
+ipdb = "^0.13.13"
 
 
 [build-system]
