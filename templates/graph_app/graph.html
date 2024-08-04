@@ -1,4 +1,3 @@
-<!-- graph_app/templates/graph.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,13 +30,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const username = "{{ request.session.name }}";
-            const socket = new WebSocket(`ws://${window.location.host}/ws/graph/?username=${encodeURIComponent(username)}`);
             
-            
-
             // Initialize D3
             const width = window.innerWidth;
             const height = window.innerHeight;
+
+            const socket = new WebSocket(`ws://${window.location.host}/ws/graph/?username=${encodeURIComponent(username)}&width=${encodeURIComponent(width)}&height=${encodeURIComponent(height)}`);
 
             const svg = d3.select("#graph").append("svg")
                 .attr("width", width)
@@ -50,13 +48,25 @@
             let links = [];
             const nodeMap = new Map(); // To quickly access nodes by ID
 
+            // Create the force simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id))
+                .force("charge", d3.forceManyBody())
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
             // Update graph with data
             function updateGraph(data) {
+                // Ensure data is not undefined
+                if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
+                    console.error('Invalid data format:', data);
+                    return;
+                }
+
                 nodes = data.nodes;
                 links = data.links;
                 nodeMap.clear();
                 nodes.forEach(node => nodeMap.set(node.id, node));
-
+                alert(nodes)
                 // Update links
                 const link = linkGroup.selectAll(".link")
                     .data(links, d => `${d.source}-${d.target}`);
@@ -64,10 +74,10 @@
                 link.enter().append("line")
                     .attr("class", "link")
                     .merge(link)
-                    .attr("x1", d => nodeMap.get(d.source).x)
-                    .attr("y1", d => nodeMap.get(d.source).y)
-                    .attr("x2", d => nodeMap.get(d.target).x)
-                    .attr("y2", d => nodeMap.get(d.target).y);
+                    .attr("x1", d => nodeMap.get(d.source)?.x || 0)
+                    .attr("y1", d => nodeMap.get(d.source)?.y || 0)
+                    .attr("x2", d => nodeMap.get(d.target)?.x || 0)
+                    .attr("y2", d => nodeMap.get(d.target)?.y || 0);
 
                 link.exit().remove();
 
@@ -78,38 +88,58 @@
                 const nodeEnter = node.enter().append("circle")
                     .attr("class", "node")
                     .attr("r", 10)
+                    .attr("id", d => d.id)
                     .attr("fill", d => d.id === username ? "red" : "blue")
-                    .call(d3.drag()
-                        .on("start", dragstarted)
-                        .on("drag", dragged)
-                        .on("end", dragended));
+                    // .call(d3.drag()
+                    //     .on("start", dragstarted)
+                    //     .on("drag", dragged)
+                    //     .on("end", dragended));
 
                 nodeEnter.append("title")
                     .text(d => d.id);
 
                 node.merge(nodeEnter)
-                    .attr("cx", d => d.x)
-                    .attr("cy", d => d.y);
+                    .attr("cx", d => d.x || 0)
+                    .attr("cy", d => d.y || 0);
 
-                node.exit().remove();
+                // Add labels for nodes
+                const label = nodeGroup.selectAll(".label")
+                    .data(nodes, d => d.id);
 
-                // Function for drag behavior
-                function dragstarted(event, d) {
-                    if (!event.active) simulation.alphaTarget(0.3).restart();
-                    d.fx = d.x;
-                    d.fy = d.y;
-                }
+                label.enter().append("text")
+                    .attr("class", "label")
+                    .attr("text-anchor", "middle")
+                    .attr("x", d => d.x || 0)
+                    .attr("y", d => d.y - 15 || 0) // Position label above node
+                    .text(d => d.id)
+                    .merge(label)
+                    .attr("x", d => d.x || 0)
+                    .attr("y", d => d.y - 15 || 0); // Update label position
 
-                function dragged(event, d) {
-                    d.fx = event.x;
-                    d.fy = event.y;
-                }
+                label.exit().remove();
 
-                function dragended(event, d) {
-                    if (!event.active) simulation.alphaTarget(0);
-                    d.fx = null;
-                    d.fy = null;
-                }
+                // Restart simulation with new data
+                simulation.nodes(nodes);
+                simulation.force("link").links(links);
+                simulation.alpha(1).restart();
+
+                // // Function for drag behavior
+                // function dragstarted(event, d) {
+                //     if (!event.active) simulation.alphaTarget(0.3).restart();
+                //     d.fx = d.x;
+                //     d.fy = d.y;
+                // }
+
+                // function dragged(event, d) {
+                //     d.fx = event.x;
+                //     d.fy = event.y;
+                // }
+
+                // function dragended(event, d) {
+                //     if (!event.active) simulation.alphaTarget(0);
+                //     d.fx = null;
+                //     d.fy = null;
+                // }
             }
 
             // Handle incoming WebSocket messages
@@ -120,6 +150,7 @@
 
             // Send updates to the server when a node is clicked
             nodeGroup.on("click", function (event, d) {
+                alert(d)
                 if (d.id !== username) {
                     const newLink = {
                         source: username,
