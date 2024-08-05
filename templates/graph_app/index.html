@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Digite o seu nome</title>
+</head>
+<body>
+    <h1>Digite o seu nome</h1>
+    <form method="post">
+        {% csrf_token %}
+        <input type="text" name="name" pattern="[A-Za-z\s]+" required placeholder="Só letras e espaços :D">
+        <button type="submit">Entrar</button>
+    </form>
+</body>
+</html>

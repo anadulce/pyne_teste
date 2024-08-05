@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Grafo de Amizades Pythonicas</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stomp-websocket@2"></script>
+    <style>
+        svg {
+            width: 100%;
+            height: 100vh;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        .label {
+            font-size: 12px;
+            pointer-events: none; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Grafo de Amizades Pythonicas</h1>
+    <div id="graph"></div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const username = "{{ request.session.name }}";
+            
+            // Inicializando D3
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            // Inicializando socket
+            const socket = new WebSocket(`ws://${window.location.host}/ws/graph/?username=${encodeURIComponent(username)}&width=${encodeURIComponent(width)}&height=${encodeURIComponent(height)}`);
+
+            // Definindo grafo
+            const svg = d3.select("#graph").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const linkGroup = svg.append("g").attr("class", "links");
+            const nodeGroup = svg.append("g").attr("class", "nodes");
+
+            let nodes = [];
+            let links = [];
+            const nodeMap = new Map(); // Acesso via ID
+
+            // Force simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id))
+                .force("charge", d3.forceManyBody())
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            // Atualizando Grafo
+            function updateGraph(data) {
+                // Garantindo dados válidos
+                if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
+                    console.error('Invalid data format:', data);
+                    return;
+                }
+
+                nodes = data.nodes;
+                links = data.links;
+                nodeMap.clear();
+                nodes.forEach(node => nodeMap.set(node.id, node));
+                // Atualizando links
+                const link = linkGroup.selectAll(".link")
+                    .data(links, d => `${d.source}-${d.target}`);
+
+                link.enter().append("line")
+                    .attr("class", "link")
+                    .merge(link)
+                    .attr("x1", d => nodeMap.get(d.source)?.x || 0)
+                    .attr("y1", d => nodeMap.get(d.source)?.y || 0)
+                    .attr("x2", d => nodeMap.get(d.target)?.x || 0)
+                    .attr("y2", d => nodeMap.get(d.target)?.y || 0);
+
+                link.exit().remove();
+
+                // Atualizando nós
+                const node = nodeGroup.selectAll(".node")
+                    .data(nodes, d => d.id);
+
+                const nodeEnter = node.enter().append("circle")
+                    .attr("class", "node")
+                    .attr("r", 10)
+                    .attr("id", d => d.id)
+                    .attr("fill", d => d.id === username ? "red" : "blue")
+                    .on("click", handleClick);
+
+                nodeEnter.append("title")
+                    .text(d => d.id);
+
+                node.merge(nodeEnter)
+                    .attr("cx", d => d.x || 0)
+                    .attr("cy", d => d.y || 0);
+
+                // Adicionando labels aos nós
+                const label = nodeGroup.selectAll(".label")
+                    .data(nodes, d => d.id);
+
+                label.enter().append("text")
+                    .attr("class", "label")
+                    .attr("text-anchor", "middle")
+                    .attr("x", d => d.x || 0)
+                    .attr("y", d => d.y - 15 || 0) // Posição acima do nó
+                    .text(d => d.id)
+                    .merge(label)
+                    .attr("x", d => d.x || 0)
+                    .attr("y", d => d.y - 15 || 0); // Atualizando posição
+
+                label.exit().remove();
+
+                // Reiniciando a simulação
+                simulation.nodes(nodes);
+                simulation.force("link").links(links);
+                simulation.alpha(1).restart();
+
+            }
+
+            // Capturando mensagens que vem do websocket
+            socket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                updateGraph(data);
+            };
+
+            // Enviando informações quando um nó é clicado
+            function handleClick (event, d) {
+                if (d.id !== username) {
+                    const newLink = {
+                        source: username,
+                        target: d.id
+                    };
+                    links.push(newLink);
+                    socket.send(JSON.stringify({
+                        target: d.id
+                    }));
+                }
+            };
+        });
+    </script>
+</body>
+</html>
