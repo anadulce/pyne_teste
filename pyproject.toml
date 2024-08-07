@@ -2,7 +2,7 @@
 name = "pyne-teste"
 version = "0.1.0"
 description = ""
-authors = ["Ana Dulce <ana.torres@jusbrasil.com.br>"]
+authors = ["Ana Dulce <anadulcepadovan@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
