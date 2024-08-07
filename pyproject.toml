@@ -9,7 +9,11 @@ readme = "README.md"
 python = "^3.9"
 channels = {extras = ["daphne"], version = "^4.1.0"}
 django = "^4.2"
+channels-redis = "^4.2.0"
 
+
+[tool.poetry.group.dev.dependencies]
+ipdb = "^0.13.13"
 
 [build-system]
 requires = ["poetry-core"]
