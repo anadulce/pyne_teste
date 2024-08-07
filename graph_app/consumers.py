@@ -35,6 +35,7 @@ class GraphConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         # Fecha a conexão
+
         await self.channel_layer.group_discard(
             GRAPH,
             self.channel_name
@@ -78,7 +79,13 @@ class GraphConsumer(AsyncWebsocketConsumer):
         
         # Se não houver erros, cria o link
         if not source_error and not target_error:
-            Link.objects.create(source=source_node, target=target_node)
+            if not (link := Link.objects.filter(source=source_node, target=target_node)):
+                Link.objects.create(source=source_node, target=target_node)
+                Link.objects.create(source=target_node, target=source_node)
+            else:
+                link.delete()
+                Link.objects.filter(source=target_node, target=source_node).delete()
+
 
     @database_sync_to_async
     def get_graph_state(self):
