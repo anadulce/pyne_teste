@@ -19,12 +19,9 @@ def graph(request):
     return render(request, 'graph_app/graph.html')
 
 def reset_graph(request):
-    if request.method == 'POST':
-        key = request.POST.get('key')
-
-        # Se o nome tiver qualquer coisa diferente de letras e espaços, tá barrado
+    if request.method == 'GET':
+        key = request.GET.get('key')
         if key == settings.DATABASE_RESTORE_KEY:
             Node.objects.all().delete()
-            return redirect('index')
-    return render(request, 'graph_app/reset.html')
+    return redirect('index')
     
