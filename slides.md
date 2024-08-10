@@ -100,7 +100,9 @@ Casos de uso comuns:
 ---
 ## Exibição de uma aplicação teste
 
+# http://54.200.38.210
 ![alt text](image-1.png)
+
 ---
 
 ## Agradecimentos
