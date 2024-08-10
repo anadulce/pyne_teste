@@ -106,4 +106,4 @@ Casos de uso comuns:
 ## Agradecimentos
 
 Lucas Carvalho do grupy-sanca 
-Renan de Assis
+Sarah Tuyani - PyLadies DF
