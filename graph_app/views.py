@@ -1,5 +1,6 @@
 import re
 
+from django.conf import settings
 from django.shortcuts import render, redirect
 
 from graph_app.models import Node
@@ -18,7 +19,12 @@ def graph(request):
     return render(request, 'graph_app/graph.html')
 
 def reset_graph(request):
-    Node.objects.all().delete()
-    return redirect('index')
+    if request.method == 'POST':
+        key = request.POST.get('key')
 
+        # Se o nome tiver qualquer coisa diferente de letras e espaços, tá barrado
+        if key == settings.DATABASE_RESTORE_KEY:
+            Node.objects.all().delete()
+            return redirect('index')
+    return render(request, 'graph_app/reset.html')
     
